@@ -9,7 +9,7 @@ use std::{
 use crate::model::{AnalyzeOptions, DirectorySummary};
 use crate::{
     error::AnalysisError,
-    model::{DuplicateGroup, FileInfo, FolderInfo},
+    model::{DuplicateGroup, FileInfoDirectory, FolderInfo},
 };
 use sha2::{Digest, Sha256};
 use walkdir::{DirEntry, WalkDir};
@@ -77,7 +77,7 @@ pub fn directory_analyzer(option: &AnalyzeOptions) -> Result<DirectorySummary, A
                         .push(entry.path().to_path_buf());
                 }
 
-                top_files.push(FileInfo::new(entry.path().to_path_buf(), size));
+                top_files.push(FileInfoDirectory::new(entry.path().to_path_buf(), size));
                 if top_files.len() > option.top_n() {
                     top_files.pop();
                 }
