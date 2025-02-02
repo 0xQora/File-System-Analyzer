@@ -20,6 +20,14 @@ A command-line tool for analyzing directory structures and searching files with 
 - Date modified filters
 - Combined search criteria
 
+## Installation
+
+1. Ensure Rust toolchain is installed ([rustup.rs](https://rustup.rs/))
+2. Clone repository
+3. Build and install:
+```bash
+cargo install --path .
+```
 
 ## Usage
 
