@@ -1,9 +1,11 @@
-use chrono::{NaiveDate, NaiveDateTime};
-use clap::builder::styling::Reset;
 use clap::error::Result;
 use glob::Pattern;
+
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::time::SystemTime;
+
+use crate::utils;
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct FileInfoDirectory {
@@ -45,8 +47,8 @@ impl FileInfoDirectory {
         &self.path
     }
 
-    pub fn size(&self) -> u64 {
-        self.size
+    pub fn size(&self) -> &u64 {
+        &self.size
     }
 }
 
@@ -60,8 +62,8 @@ impl FolderInfo {
         &self.path
     }
 
-    pub fn size(&self) -> u64 {
-        self.size
+    pub fn size(&self) -> &u64 {
+        &self.size
     }
 }
 
@@ -74,8 +76,8 @@ impl DuplicateGroup {
         &self.files
     }
 
-    pub fn size(&self) -> u64 {
-        self.size
+    pub fn size(&self) -> &u64 {
+        &self.size
     }
 
     pub fn hash(&self) -> &str {
@@ -106,20 +108,20 @@ impl DirectorySummary {
         }
     }
 
-    pub fn total_size(&self) -> u64 {
-        self.total_size
+    pub fn total_size(&self) -> &u64 {
+        &self.total_size
     }
 
-    pub fn file_count(&self) -> u64 {
-        self.file_count
+    pub fn file_count(&self) -> &u64 {
+        &self.file_count
     }
 
-    pub fn folder_count(&self) -> u64 {
-        self.folder_count
+    pub fn folder_count(&self) -> &u64 {
+        &self.folder_count
     }
 
-    pub fn symlink_count(&self) -> u64 {
-        self.symlink_count
+    pub fn symlink_count(&self) -> &u64 {
+        &self.symlink_count
     }
 
     pub fn duration(&self) -> std::time::Duration {
@@ -321,45 +323,35 @@ impl FromStr for FileType {
             "file" => Ok(FileType::File),
             "dir" | "directory" => Ok(FileType::Dir),
             "sym" | "symlink" | "link" => Ok(FileType::Sym),
-            _ => Err(format!("Invalid file type: '{}'. Valid values are: file, dir, sym", s)),
+            _ => Err(format!(
+                "Invalid file type: '{}'. Valid values are: file, dir, sym",
+                s
+            )),
         }
     }
 }
-
 
 pub struct SearchOptions {
     path: PathBuf,
     name_pattern: Vec<Pattern>,
     content_pattern: Option<String>,
-    modified_after: Option<NaiveDateTime>,
-    modified_before: Option<NaiveDateTime>,
+    modified_after: Option<SystemTime>,
+    modified_before: Option<SystemTime>,
     min_size: Option<u64>,
     max_size: Option<u64>,
-    file_type: Option<FileType>,
 }
 
 impl SearchOptions {
     pub fn new(
         path: PathBuf,
-        name_pattern: Vec<String>,
+        name_pattern: Vec<Pattern>,
         content_pattern: Option<String>,
-        modified_after: Option<NaiveDate>,
-        modified_before: Option<NaiveDate>,
+        modified_after: Option<SystemTime>,
+        modified_before: Option<SystemTime>,
         min_size: Option<u64>,
         max_size: Option<u64>,
-        file_type: Option<String>,
     ) -> Result<Self, String> {
         // Convert name patterns with proper error handling
-        let name_pattern = name_pattern
-            .into_iter()
-            .map(|p| Pattern::new(&p).map_err(|e| format!("Invalid pattern '{}': {}", p, e)))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        // Convert file type string to enum
-        let file_type = match file_type {
-            Some(s) => Some(FileType::from_str(&s)?),
-            None => None,
-        };
 
         Ok(Self {
             path,
@@ -369,7 +361,6 @@ impl SearchOptions {
             modified_before,
             min_size,
             max_size,
-            file_type,
         })
     }
 
@@ -377,8 +368,29 @@ impl SearchOptions {
     pub fn path(&self) -> &PathBuf {
         &self.path
     }
+    pub fn content_pattern(&self) -> &Option<String> {
+        &self.content_pattern
+    }
+    pub fn name_pattern(&self) -> &Vec<Pattern> {
+        &self.name_pattern
+    }
+    pub fn modified_after(&self) -> &Option<SystemTime> {
+        &self.modified_after
+    }
+    pub fn modified_before(&self) -> &Option<SystemTime> {
+        &self.modified_before
+    }
+    pub fn min_size(&self) -> &Option<u64> {
+        &self.min_size
+    }
+    pub fn max_size(&self) -> &Option<u64> {
+        &self.max_size
+    }
 
-    pub fn is_pattern(&self, path: &Path) -> bool {
+    pub fn match_name_pattern(&self, path: &Path) -> bool {
+        if self.name_pattern.is_empty() {
+            return true;
+        }
         if let Some(path_str) = path.to_str() {
             self.name_pattern
                 .iter()
@@ -388,43 +400,74 @@ impl SearchOptions {
         }
     }
 
-    pub fn content_pattern(&self) -> Option<&String> {
-        self.content_pattern.as_ref()
+    pub fn match_content_pattern(&self, path: &Path) -> (bool, Option<(usize, String)>) {
+        match &self.content_pattern {
+            Some(content_pattern) => {
+                match utils::content_exists_in_file(path, content_pattern) {
+                    Ok(Some(line_info)) => (true, Some(line_info)),
+                    Ok(None) => (false, None),
+                    Err(_) => (false, None), // Treat errors as no match
+                }
+            }
+            None => (true, None), // No content pattern means
+        }
     }
 
-    pub fn modified_after(&self) -> Option<&NaiveDateTime> {
-        self.modified_after.as_ref()
+    pub fn match_modified_date(&self, modified_time: &SystemTime) -> bool {
+        match &self.modified_after {
+            Some(time) => {
+                if !(time < modified_time) {
+                    return false;
+                }
+            }
+            None => {}
+        }
+        match &self.modified_before {
+            Some(time) => {
+                if !(time > modified_time) {
+                    return false;
+                }
+            }
+            None => {}
+        }
+
+        return true;
     }
 
-    pub fn modified_before(&self) -> Option<&NaiveDateTime> {
-        self.modified_before.as_ref()
-    }
+    pub fn match_size(&self, size: &u64) -> bool {
+        match &self.min_size {
+            Some(min_size) => {
+                if !(min_size < size) {
+                    return false;
+                }
+            }
+            None => {}
+        }
+        match &self.max_size {
+            Some(max_size) => {
+                if !(size < max_size) {
+                    return false;
+                }
+            }
+            None => {}
+        }
 
-    pub fn min_size(&self) -> Option<u64> {
-        self.min_size
-    }
-
-    pub fn max_size(&self) -> Option<u64> {
-        self.max_size
-    }
-
-    pub fn file_type(&self) -> Option<&FileType> {
-        self.file_type.as_ref()
+        return true;
     }
 }
 
 pub struct FileInfoSearch {
     path: PathBuf,
     size: u64,
-    content: Option<(u32, String)>,
-    modified_date: Option<NaiveDateTime>,
+    content: Option<(usize, String)>,
+    modified_date: SystemTime,
 }
 impl FileInfoSearch {
     pub fn new(
         path: PathBuf,
         size: u64,
-        content: Option<(u32, String)>,
-        modified_date: Option<NaiveDateTime>,
+        content: Option<(usize, String)>,
+        modified_date: SystemTime,
     ) -> Self {
         FileInfoSearch {
             path,
@@ -432,6 +475,19 @@ impl FileInfoSearch {
             content,
             modified_date,
         }
+    }
+
+    pub fn path(&self) -> &PathBuf {
+        &self.path
+    }
+    pub fn size(&self) -> &u64 {
+        &self.size
+    }
+    pub fn modified_date(&self) -> &SystemTime {
+        &self.modified_date
+    }
+    pub fn content(&self) -> &Option<(usize, String)> {
+        &self.content
     }
 }
 
@@ -455,6 +511,18 @@ impl SearchResult {
             files_result,
         }
     }
+    pub fn files_result(&self) -> &Vec<FileInfoSearch> {
+        &self.files_result
+    }
+    pub fn total_size(&self) -> &u64 {
+        &self.total_size
+    }
+    pub fn search_time(&self) -> &std::time::Duration {
+        &self.search_time
+    }
+    pub fn file_searched(&self) -> &u64 {
+        &self.file_searched
+    }
 
     pub fn add_to_total_size(&mut self, size: u64) {
         self.total_size += size;
@@ -462,5 +530,13 @@ impl SearchResult {
 
     pub fn increment_file_searched(&mut self) {
         self.file_searched += 1;
+    }
+
+    pub fn set_files_result(&mut self, files_result: Vec<FileInfoSearch>) {
+        self.files_result = files_result;
+    }
+
+    pub fn set_duration(&mut self, duration: std::time::Duration) {
+        self.search_time = duration;
     }
 }

@@ -1,12 +1,13 @@
 use clap::{Parser, Subcommand};
+use glob::Pattern;
 use std::path::PathBuf;
-use chrono::NaiveDate;
 
 mod analyzer;
 mod display;
 mod error;
 mod model;
 mod search;
+mod utils;
 
 use crate::model::{AnalyzeOptions, SearchOptions};
 
@@ -58,8 +59,6 @@ struct SearchCommand {
     min_size: Option<u64>,
     #[arg(long,alias = "max")]
     max_size: Option<u64>,
-    #[arg(short = 't', long)]
-    file_type: Option<String>,
 }
 
 fn main() {
@@ -126,27 +125,24 @@ fn convert_analyze_command(cmd: AnalyzeCommand) -> Result<AnalyzeOptions, String
         cmd.ignore.unwrap_or_default(),
     )
 }
-
 fn convert_search_command(cmd: SearchCommand) -> Result<SearchOptions, String> {
+    let name_pattern = cmd.name_pattern
+        .into_iter()
+        .map(|s| Pattern::new(&s).map_err(|e| format!("Invalid name pattern '{}': {}", s, e)))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let modified_after = utils::parse_date(cmd.modified_after, "modified_after")?;
+    let modified_before = utils::parse_date(cmd.modified_before, "modified_before")?;
+
+
     SearchOptions::new(
         cmd.path,
-        cmd.name_pattern,
+        name_pattern,
         cmd.content_pattern,
-        parse_date(cmd.modified_after, "modified_after")?,
-        parse_date(cmd.modified_before, "modified_before")?,
+        modified_after,
+        modified_before,
         cmd.min_size,
-        cmd.max_size,
-        cmd.file_type,
+        cmd.max_size
     )
 }
 
-
-fn parse_date(input: Option<String>, field: &str) -> Result<Option<NaiveDate>, String> {
-    if let Some(s) = input {
-        NaiveDate::parse_from_str(&s, "%Y-%m-%d")
-            .map(Some)
-            .map_err(|e| format!("Invalid {} date: {}. Expected format: YYYY-MM-DD", field, e))
-    } else {
-        Ok(None)
-    }
-}
