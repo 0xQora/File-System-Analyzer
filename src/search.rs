@@ -43,23 +43,27 @@ pub fn file_finder(option: &SearchOptions) -> Result<SearchResult, AnalysisError
             if !option.match_name_pattern(entry.path()) {
                 continue;
             }
-            let (matched ,content) = option.match_content_pattern(entry.path());
-            if  !matched{
+            let (matched, content) = option.match_content_pattern(entry.path());
+            if !matched {
                 continue;
             }
             let modified_time = metadata.modified().unwrap();
-            if !option.match_modified_date(&modified_time){
+            if !option.match_modified_date(&modified_time) {
                 continue;
             }
             let size = metadata.len();
-            if !option.match_size(&size){
+            if !option.match_size(&size) {
                 continue;
             }
-            
-            file_result.push(FileInfoSearch::new(entry.path().to_path_buf(), size, content, modified_time));
+
+            file_result.push(FileInfoSearch::new(
+                entry.path().to_path_buf(),
+                size,
+                content,
+                modified_time,
+            ));
             search_result.add_to_total_size(size);
         }
-
     }
     search_result.set_files_result(file_result);
     search_result.set_duration(start_time.elapsed());

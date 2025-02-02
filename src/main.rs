@@ -11,9 +11,13 @@ mod utils;
 
 use crate::model::{AnalyzeOptions, SearchOptions};
 
-
 #[derive(Parser)]
-#[command(author, version, about = "A File System Analyzer & Finder", subcommand_negates_reqs = true)]
+#[command(
+    author,
+    version,
+    about = "A File System Analyzer & Finder",
+    subcommand_negates_reqs = true
+)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -51,13 +55,13 @@ struct SearchCommand {
     name_pattern: Vec<String>,
     #[arg(short = 'c', long)]
     content_pattern: Option<String>,
-    #[arg(short = 'a',long)]
+    #[arg(short = 'a', long)]
     modified_after: Option<String>,
-    #[arg(short = 'b',long)]
+    #[arg(short = 'b', long)]
     modified_before: Option<String>,
     #[arg(long, alias = "min")]
     min_size: Option<u64>,
-    #[arg(long,alias = "max")]
+    #[arg(long, alias = "max")]
     max_size: Option<u64>,
 }
 
@@ -126,14 +130,14 @@ fn convert_analyze_command(cmd: AnalyzeCommand) -> Result<AnalyzeOptions, String
     )
 }
 fn convert_search_command(cmd: SearchCommand) -> Result<SearchOptions, String> {
-    let name_pattern = cmd.name_pattern
+    let name_pattern = cmd
+        .name_pattern
         .into_iter()
         .map(|s| Pattern::new(&s).map_err(|e| format!("Invalid name pattern '{}': {}", s, e)))
         .collect::<Result<Vec<_>, _>>()?;
 
     let modified_after = utils::parse_date(cmd.modified_after, "modified_after")?;
     let modified_before = utils::parse_date(cmd.modified_before, "modified_before")?;
-
 
     SearchOptions::new(
         cmd.path,
@@ -142,7 +146,6 @@ fn convert_search_command(cmd: SearchCommand) -> Result<SearchOptions, String> {
         modified_after,
         modified_before,
         cmd.min_size,
-        cmd.max_size
+        cmd.max_size,
     )
 }
-

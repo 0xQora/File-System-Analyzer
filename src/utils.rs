@@ -1,6 +1,6 @@
 use std::{fs::File, io::{self, BufRead, BufReader}, path::Path, time::SystemTime};
 
-use chrono::{DateTime, Local, NaiveDate, NaiveTime};
+use chrono::{DateTime, Local, NaiveDate, NaiveTime, Utc};
 
 pub fn content_exists_in_file(file_path: &Path, search_string: &str) -> io::Result<Option<(usize, String)>> {
     let file = File::open(file_path)?;
@@ -124,4 +124,9 @@ pub fn parse_date(input: Option<String>, field: &str) -> Result<Option<SystemTim
             .and_utc()
             .into())
     }).transpose()
+}
+
+pub fn convert_system_time(time: SystemTime) -> String {
+    let datetime: DateTime<Utc> = time.into(); 
+    datetime.format("%Y-%m-%d").to_string()
 }

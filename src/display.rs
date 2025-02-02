@@ -93,17 +93,16 @@ fn display_simple_search(
         result.files_result().len()
     );
 
-    // Display search criteria
     if !options.name_pattern().is_empty() {
         for pattern in options.name_pattern() {
             println!("└── Pattern: \"{}\"", pattern);
         }
     }
     if let Some(date) = &options.modified_after() {
-        println!("└── Modified after: {:#?}", date);
+        println!("└── Modified after: {}", utils::convert_system_time(*date));
     }
     if let Some(date) = &options.modified_before() {
-        println!("└── Modified before: {:#?}", date);
+        println!("└── Modified before: {}", utils::convert_system_time(*date));
     }
     if let Some(min) = options.min_size() {
         println!("└── Min size: {}", utils::format_size(min));
@@ -113,7 +112,6 @@ fn display_simple_search(
     }
     println!();
 
-    // Display files
     for file in result.files_result() {
         println!("{}", file.path().display());
         println!("├── Size: {}", utils::format_size(file.size()));
@@ -124,7 +122,6 @@ fn display_simple_search(
         println!();
     }
 
-    // Display summary
     println!("📊 Summary:");
     println!("├── Files found: {}", result.files_result().len());
     println!(
@@ -148,15 +145,18 @@ fn display_content_search(
         result.files_result().len()
     );
 
-    // Display matches
     for file in result.files_result() {
         if let Some((line_num, content)) = file.content() {
             let path_str = file.path().display().to_string();
-            println!("{}:{} - {}", utils::truncate_path(&path_str, 30), line_num, content);
+            println!(
+                "{}:{} - {}",
+                utils::truncate_path(&path_str, 30),
+                line_num,
+                content
+            );
         }
     }
 
-    // Display summary
     println!("\n📊 Summary:");
     println!("├── Files searched: {}", result.file_searched());
     println!("├── Matches found: {}", result.files_result().len());
